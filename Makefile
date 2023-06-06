@@ -10,3 +10,6 @@ runfollower: build
 ct: 
 	@go build -o bin/client client/main.go
 	@./bin/client
+
+test:
+	@go test -v ./...

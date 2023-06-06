@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"time"
@@ -52,11 +53,15 @@ func (s *Server) readLoop(conn net.Conn) {
 	for {
 		cmd, err := core.ParseCommand(conn)
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
 			log.Println("parse command error:", err)
 			break
 		}
 		go s.handleCommand(conn, cmd)
 	}
+	fmt.Println("connection closed: ", conn.RemoteAddr())
 }
 
 func (s *Server) handleCommand(conn net.Conn, cmd any) {
@@ -71,6 +76,7 @@ func (s *Server) handleCommand(conn net.Conn, cmd any) {
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, cmd *core.CommandSet) error {
+	fmt.Printf("setting : %s => %s\n", cmd.Key, cmd.Value)
 	return s.cache.Set(cmd.Key, cmd.Value, time.Duration(cmd.TTL)*time.Second)
 }
 

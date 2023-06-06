@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"net"
+
+	"github.com/Koshkaj/cashe/core"
 )
 
 type Options struct{}
@@ -22,7 +24,17 @@ func New(endpoint string, opts Options) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Set(ctx context.Context, key, value []byte) (any, error) {
+func (c *Client) Set(ctx context.Context, key []byte, value []byte, ttl int) (any, error) {
+	cmd := &core.CommandSet{
+		Key:   key,
+		Value: value,
+		TTL:   ttl,
+	}
+	_, err := c.conn.Write(cmd.Bytes())
+	if err != nil {
+		return nil, err
+
+	}
 	return nil, nil
 }
 

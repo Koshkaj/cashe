@@ -3,14 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
-	"net"
 	"time"
 
 	"github.com/Koshkaj/cashe/cache"
 	"github.com/Koshkaj/cashe/client"
-	"github.com/Koshkaj/cashe/core"
 )
 
 func main() {
@@ -27,10 +24,14 @@ func main() {
 
 	go func() {
 		time.Sleep(time.Second * 2)
-		for i := 0; i < 8; i++ {
-			SendCommand()
-			time.Sleep(time.Millisecond * 2)
+		cl, err := client.New(":3000", client.Options{})
+		if err != nil {
+			log.Fatal(err)
 		}
+		for i := 0; i < 8; i++ {
+			SendCommand(cl)
+		}
+		cl.Close()
 	}()
 
 	server := NewServer(opts, cache.New())
@@ -38,25 +39,9 @@ func main() {
 
 }
 
-func SendCommand() {
-	cmd := &core.CommandSet{
-		Key:   []byte("keytest"),
-		Value: []byte("valuetest"),
-		TTL:   9,
-	}
-	cl, err := client.New(":3000", client.Options{})
+func SendCommand(c *client.Client) {
+	_, err := c.Set(context.Background(), []byte("anyhow"), []byte("wassup"), 20)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	resp, err := cl.Set(context.Background(), []byte("foo"), []byte("bar"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(resp)
-	conn, err := net.Dial("tcp", ":3000")
-	if err != nil {
-		log.Fatal(err)
-	}
-	conn.Write(cmd.Bytes())
 }

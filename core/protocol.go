@@ -7,58 +7,27 @@ import (
 	"io"
 )
 
-// type Command string
+type Status byte
 
-// const (
-// 	CMDSet Command = "SET"
-// 	CMDGet Command = "GET"
-// )
+func (s Status) String() string {
+	switch s {
+	case StatusError:
+		return "ERR"
+	case StatusOK:
+		return "OK"
+	case StatusKeyNotFound:
+		return "KEYNOTFOUND"
+	default:
+		return "NONE"
+	}
+}
 
-// type Message struct {
-// 	Cmd   Command
-// 	Key   []byte
-// 	Value []byte
-// 	TTL   time.Duration
-// }
-
-// func (m *Message) ToBytes() []byte {
-// 	switch m.Cmd {
-// 	case CMDSet:
-// 		cmd := fmt.Sprintf("%s %s %s %d", m.Cmd, m.Key, m.Value, m.TTL)
-// 		return []byte(cmd)
-// 	case CMDGet:
-// 		cmd := fmt.Sprintf("%s %s ", m.Cmd, m.Key)
-// 		return []byte(cmd)
-// 	default:
-// 		panic("unknown command")
-// 	}
-// }
-
-// func parseMessage(raw []byte) (*Message, error) {
-// 	var (
-// 		rawStr = string(raw)
-// 		parts  = strings.Split(rawStr, " ")
-// 	)
-// 	if len(parts) < 2 {
-// 		return nil, fmt.Errorf("invalid command %s", raw)
-// 	}
-// 	msg := &Message{
-// 		Cmd: Command(parts[0]),
-// 		Key: []byte(parts[1]),
-// 	}
-// 	if msg.Cmd == CMDSet {
-// 		if len(parts) < 4 {
-// 			return nil, fmt.Errorf("invalid SET command")
-// 		}
-// 		msg.Value = []byte(parts[2])
-// 		ttl, err := strconv.Atoi(parts[3])
-// 		if err != nil {
-// 			return nil, fmt.Errorf("invalid SET TTL")
-// 		}
-// 		msg.TTL = time.Duration(ttl) * time.Minute
-// 	}
-// 	return msg, nil
-// }
+const (
+	StatusNone Status = iota
+	StatusOK
+	StatusError
+	StatusKeyNotFound
+)
 
 type Command byte
 
@@ -67,7 +36,56 @@ const (
 	CmdSet
 	CmdGet
 	CmdDel
+	CmdJoin
 )
+
+type ResponseSet struct {
+	Status Status
+}
+
+func (r *ResponseSet) Bytes() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, r.Status)
+	return buf.Bytes()
+}
+
+type ResponseGet struct {
+	Status Status
+	Value  []byte
+}
+
+func (r *ResponseGet) Bytes() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, r.Status)
+
+	valueLen := int32(len(r.Value))
+	binary.Write(buf, binary.LittleEndian, valueLen)
+	binary.Write(buf, binary.LittleEndian, r.Value)
+	return buf.Bytes()
+}
+
+func ParseSetResponse(r io.Reader) (*ResponseSet, error) {
+	resp := &ResponseSet{}
+	err := binary.Read(r, binary.LittleEndian, &resp.Status)
+	return resp, err
+}
+
+func ParseGetResponse(r io.Reader) (*ResponseGet, error) {
+	resp := &ResponseGet{}
+	binary.Read(r, binary.LittleEndian, &resp.Status)
+
+	var valueLen int32
+	binary.Read(r, binary.LittleEndian, &valueLen)
+
+	resp.Value = make([]byte, valueLen)
+	binary.Read(r, binary.LittleEndian, &resp.Value)
+
+	return resp, nil
+
+}
+
+type CommandJoin struct {
+}
 
 type CommandSet struct {
 	Key   []byte
@@ -119,6 +137,8 @@ func ParseCommand(r io.Reader) (any, error) {
 		return parseSetCommand(r), nil
 	case CmdGet:
 		return parseGetCommand(r), nil
+	case CmdJoin:
+		return &CommandJoin{}, nil
 	default:
 		return nil, fmt.Errorf("invalid command %s", string(cmd))
 	}

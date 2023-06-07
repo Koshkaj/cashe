@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -24,14 +27,9 @@ func main() {
 
 	go func() {
 		time.Sleep(time.Second * 2)
-		cl, err := client.New(":3000", client.Options{})
-		if err != nil {
-			log.Fatal(err)
+		if opts.IsLeader {
+			SendCommand()
 		}
-		for i := 0; i < 8; i++ {
-			SendCommand(cl)
-		}
-		cl.Close()
 	}()
 
 	server := NewServer(opts, cache.New())
@@ -39,9 +37,32 @@ func main() {
 
 }
 
-func SendCommand(c *client.Client) {
-	_, err := c.Set(context.Background(), []byte("anyhow"), []byte("wassup"), 20)
-	if err != nil {
-		log.Fatal(err)
+func randomBytes(n int) []byte {
+	buf := make([]byte, n)
+	io.ReadFull(rand.Reader, buf)
+	return buf
+}
+
+func SendCommand() {
+	for i := 0; i < 100; i++ {
+		go func(i int) {
+			c, err := client.New(":3000", client.Options{})
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			time.Sleep(time.Second * 2)
+			var (
+				key   = []byte(fmt.Sprintf("key_%d", i))
+				value = []byte(fmt.Sprintf("value_%d", i))
+			)
+			err = c.Set(context.Background(), key, value, 20)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			_, err = c.Get(context.Background(), key)
+			c.Close()
+		}(i)
 	}
 }

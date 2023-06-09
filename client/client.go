@@ -61,7 +61,13 @@ func (c *Client) Delete(ctx context.Context, key []byte) error {
 	if err != nil {
 		return err
 	}
-
+	resp, err := core.ParseDelResponse(c.conn)
+	if err != nil {
+		return err
+	}
+	if resp.Status != core.StatusOK {
+		return fmt.Errorf("server responsed with error %s", resp.Status)
+	}
 	return nil
 }
 

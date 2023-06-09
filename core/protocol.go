@@ -94,6 +94,12 @@ func ParseGetResponse(r io.Reader) (*ResponseGet, error) {
 
 }
 
+func ParseDelResponse(r io.Reader) (*ResponseDel, error) {
+	resp := &ResponseDel{}
+	err := binary.Read(r, binary.LittleEndian, &resp.Status)
+	return resp, err
+}
+
 type CommandJoin struct{}
 
 type CommandSet struct {
@@ -160,7 +166,7 @@ func ParseCommand(r io.Reader) (any, error) {
 	case CmdJoin:
 		return &CommandJoin{}, nil
 	case CmdDel:
-		return parseDelCommand, nil
+		return parseDelCommand(r), nil
 	default:
 		return nil, fmt.Errorf("invalid command %s", string(cmd))
 	}

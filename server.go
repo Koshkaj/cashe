@@ -153,6 +153,15 @@ func (s *Server) handleGetCommand(conn net.Conn, cmd *core.CommandGet) error {
 }
 
 func (s *Server) handleDelCommand(conn net.Conn, cmd *core.CommandDel) error {
+	go func() {
+		for member := range s.members {
+			err := member.Delete(context.TODO(), cmd.Key)
+			if err != nil {
+				log.Println("forward to member error", err)
+			}
+		}
+	}()
+
 	resp := core.ResponseDel{}
 	if err := s.cache.Delete(cmd.Key); err != nil {
 		resp.Status = core.StatusError

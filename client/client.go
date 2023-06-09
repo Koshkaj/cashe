@@ -53,6 +53,18 @@ func (c *Client) Get(ctx context.Context, key []byte) ([]byte, error) {
 	return resp.Value, nil
 }
 
+func (c *Client) Delete(ctx context.Context, key []byte) error {
+	cmd := &core.CommandDel{
+		Key: key,
+	}
+	_, err := c.conn.Write(cmd.Bytes())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Client) Set(ctx context.Context, key []byte, value []byte, ttl int) error {
 	cmd := &core.CommandSet{
 		Key:   key,

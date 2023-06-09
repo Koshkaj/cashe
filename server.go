@@ -12,6 +12,7 @@ import (
 	"github.com/Koshkaj/cashe/cache"
 	"github.com/Koshkaj/cashe/client"
 	"github.com/Koshkaj/cashe/core"
+	"go.uber.org/zap"
 )
 
 type ServerOpts struct {
@@ -24,13 +25,17 @@ type Server struct {
 	ServerOpts
 	members map[*client.Client]struct{}
 	cache   cache.Cacher
+	logger  *zap.SugaredLogger
 }
 
 func NewServer(opts ServerOpts, c cache.Cacher) *Server {
+	l, _ := zap.NewProduction()
+	lsugar := l.Sugar()
 	return &Server{
 		ServerOpts: opts,
 		cache:      c,
 		members:    make(map[*client.Client]struct{}),
+		logger:     lsugar,
 	}
 }
 
@@ -48,7 +53,7 @@ func (s *Server) Start() error {
 		}()
 	}
 
-	log.Printf("server starting on port [%s]\n", s.ListenAddr)
+	s.logger.Infow("server starting on port", "port", s.ListenAddr)
 
 	for {
 		conn, err := ln.Accept()
@@ -65,7 +70,7 @@ func (s *Server) dialLeader() error {
 	if err != nil {
 		return fmt.Errorf("failed to dial leader [%s]", s.LeaderAddr)
 	}
-	log.Println("connected to leader : ", s.LeaderAddr)
+	s.logger.Infow("connected to leader ", "port", s.LeaderAddr)
 
 	binary.Write(conn, binary.LittleEndian, core.CmdJoin)
 	s.readLoop(conn)
@@ -74,7 +79,6 @@ func (s *Server) dialLeader() error {
 
 func (s *Server) readLoop(conn net.Conn) {
 	defer conn.Close()
-	fmt.Println("connection made: ", conn.RemoteAddr())
 	for {
 		cmd, err := core.ParseCommand(conn)
 		if err != nil {
@@ -86,7 +90,6 @@ func (s *Server) readLoop(conn net.Conn) {
 		}
 		go s.handleCommand(conn, cmd)
 	}
-	// fmt.Println("connection closed: ", conn.RemoteAddr())
 }
 
 func (s *Server) handleCommand(conn net.Conn, cmd any) {
@@ -97,14 +100,13 @@ func (s *Server) handleCommand(conn net.Conn, cmd any) {
 		s.handleGetCommand(conn, v)
 	case *core.CommandJoin:
 		s.handleJoinCommand(conn, v)
-
-		// case *CommandDel:
-		// 	s.handleDelCommand(conn, v)
+	case *core.CommandDel:
+		s.handleDelCommand(conn, v)
 	}
 }
 
 func (s *Server) handleJoinCommand(conn net.Conn, cmd *core.CommandJoin) error {
-	fmt.Println("member joined cluster", conn.RemoteAddr())
+	s.logger.Infow("member joined cluster", "address", conn.RemoteAddr())
 
 	s.members[client.NewFromConn(conn)] = struct{}{}
 	return nil
@@ -147,5 +149,18 @@ func (s *Server) handleGetCommand(conn net.Conn, cmd *core.CommandGet) error {
 	resp.Value = value
 	resp.Status = core.StatusOK
 	_, err = conn.Write(resp.Bytes())
+	return err
+}
+
+func (s *Server) handleDelCommand(conn net.Conn, cmd *core.CommandDel) error {
+	resp := core.ResponseDel{}
+	if err := s.cache.Delete(cmd.Key); err != nil {
+		resp.Status = core.StatusError
+		_, err := conn.Write(resp.Bytes())
+		return err
+	}
+	resp.Status = core.StatusOK
+
+	_, err := conn.Write(resp.Bytes())
 	return err
 }

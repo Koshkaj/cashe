@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"time"
 
@@ -25,22 +23,9 @@ func main() {
 		IsLeader:   len(*leaderAddr) == 0,
 	}
 
-	go func() {
-		time.Sleep(time.Second * 2)
-		if opts.IsLeader {
-			SendCommand()
-		}
-	}()
-
 	server := NewServer(opts, cache.New())
 	log.Fatal(server.Start())
 
-}
-
-func randomBytes(n int) []byte {
-	buf := make([]byte, n)
-	io.ReadFull(rand.Reader, buf)
-	return buf
 }
 
 func SendCommand() {

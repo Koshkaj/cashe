@@ -2,10 +2,13 @@ build:
 	@go build -o bin/cashe
 
 run: build
-	@./bin/cashe
+	@./bin/cashe --id=raft0
 
-runfollower: build
-	@./bin/cashe --listenaddr :4000 --leaderaddr :3000
+follower1: build
+	@./bin/cashe --listenaddr :3001 --leaderaddr :3000 --raftaddr=:4001 --id=raft1
+
+follower2: build
+	@./bin/cashe --listenaddr :3002 --leaderaddr :3000 --raftaddr=:4002 --id=raft2
 
 ct: 
 	@go build -o bin/client client/main.go

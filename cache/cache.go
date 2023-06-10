@@ -24,6 +24,7 @@ func (c *Cache) Set(key, value []byte, ttl time.Duration) error {
 
 	if ttl > 0 {
 		go func() {
+			// Move to the one goroutine with locking (channels)
 			<-time.After(ttl)
 			delete(c.data, string(key))
 		}()

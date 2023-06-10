@@ -100,7 +100,27 @@ func ParseDelResponse(r io.Reader) (*ResponseDel, error) {
 	return resp, err
 }
 
-type CommandJoin struct{}
+type CommandJoin struct {
+	RaftAddr []byte
+	NodeID   []byte
+}
+
+func (c *CommandJoin) Bytes() []byte {
+	buf := new(bytes.Buffer)
+
+	binary.Write(buf, binary.LittleEndian, CmdJoin)
+	var (
+		raftAddrLen = int32(len(c.RaftAddr))
+		nodeIDLen   = int32(len(c.NodeID))
+	)
+	binary.Write(buf, binary.LittleEndian, raftAddrLen)
+	binary.Write(buf, binary.LittleEndian, c.RaftAddr)
+
+	binary.Write(buf, binary.LittleEndian, nodeIDLen)
+	binary.Write(buf, binary.LittleEndian, c.NodeID)
+	return buf.Bytes()
+
+}
 
 type CommandSet struct {
 	Key   []byte
@@ -164,12 +184,29 @@ func ParseCommand(r io.Reader) (any, error) {
 	case CmdGet:
 		return parseGetCommand(r), nil
 	case CmdJoin:
-		return &CommandJoin{}, nil
+		return parseJoinCommand(r), nil
 	case CmdDel:
 		return parseDelCommand(r), nil
 	default:
 		return nil, fmt.Errorf("invalid command %s", string(cmd))
 	}
+}
+
+func parseJoinCommand(r io.Reader) *CommandJoin {
+	cmd := &CommandJoin{}
+	var (
+		raftAddrLen int32
+		nodeIDLen   int32
+	)
+	binary.Read(r, binary.LittleEndian, &raftAddrLen)
+	cmd.RaftAddr = make([]byte, raftAddrLen)
+	binary.Read(r, binary.LittleEndian, &cmd.RaftAddr)
+
+	binary.Read(r, binary.LittleEndian, &nodeIDLen)
+	cmd.NodeID = make([]byte, nodeIDLen)
+	binary.Read(r, binary.LittleEndian, &cmd.NodeID)
+
+	return cmd
 }
 
 func parseSetCommand(r io.Reader) *CommandSet {

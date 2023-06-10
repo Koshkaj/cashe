@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -12,13 +11,18 @@ import (
 	"github.com/Koshkaj/cashe/cache"
 	"github.com/Koshkaj/cashe/client"
 	"github.com/Koshkaj/cashe/core"
+	rf "github.com/Koshkaj/cashe/raft"
+	"github.com/hashicorp/raft"
 	"go.uber.org/zap"
 )
 
 type ServerOpts struct {
-	ListenAddr string
-	IsLeader   bool
-	LeaderAddr string
+	ListenAddr     string
+	IsLeader       bool
+	LeaderAddr     string
+	RaftAddr       string
+	RaftLeaderAddr string
+	NodeID         string
 }
 
 type Server struct {
@@ -26,16 +30,19 @@ type Server struct {
 	members map[*client.Client]struct{}
 	cache   cache.Cacher
 	logger  *zap.SugaredLogger
+	raft    *rf.RaftServer
 }
 
 func NewServer(opts ServerOpts, c cache.Cacher) *Server {
 	l, _ := zap.NewProduction()
 	lsugar := l.Sugar()
+	r := rf.New(opts.NodeID, opts.RaftAddr)
 	return &Server{
 		ServerOpts: opts,
 		cache:      c,
 		members:    make(map[*client.Client]struct{}),
 		logger:     lsugar,
+		raft:       r,
 	}
 }
 
@@ -65,14 +72,25 @@ func (s *Server) Start() error {
 	}
 }
 
+func (s *Server) writeJoinCmd(conn net.Conn) error {
+	cmd := &core.CommandJoin{
+		RaftAddr: []byte(s.RaftAddr),
+		NodeID:   []byte(s.NodeID),
+	}
+	_, err := conn.Write(cmd.Bytes())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Server) dialLeader() error {
 	conn, err := net.Dial("tcp", s.LeaderAddr)
 	if err != nil {
 		return fmt.Errorf("failed to dial leader [%s]", s.LeaderAddr)
 	}
 	s.logger.Infow("connected to leader ", "port", s.LeaderAddr)
-
-	binary.Write(conn, binary.LittleEndian, core.CmdJoin)
+	s.writeJoinCmd(conn)
 	s.readLoop(conn)
 	return nil
 }
@@ -107,9 +125,36 @@ func (s *Server) handleCommand(conn net.Conn, cmd any) {
 
 func (s *Server) handleJoinCommand(conn net.Conn, cmd *core.CommandJoin) error {
 	s.logger.Infow("member joined cluster", "address", conn.RemoteAddr())
-
+	// raft server connect
+	configFuture := s.raft.GetConfiguration()
+	if err := configFuture.Error(); err != nil {
+		s.logger.Errorf("failed to get raft configuration: %v", err)
+		return err
+	}
+	var (
+		nodeID = string(cmd.NodeID)
+		addr   = string(cmd.RaftAddr)
+	)
+	for _, srv := range configFuture.Configuration().Servers {
+		if srv.ID == raft.ServerID(nodeID) || srv.Address == raft.ServerAddress(addr) {
+			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
+				s.logger.Infof("node %s at %s already member of cluster, ignoring join request", nodeID, addr)
+				return nil
+			}
+			future := s.raft.RemoveServer(srv.ID, 0, 0)
+			if err := future.Error(); err != nil {
+				return fmt.Errorf("error removing existing node %s at %s: %s", nodeID, addr, err)
+			}
+		}
+	}
+	f := s.raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 0, 0)
+	if f.Error() != nil {
+		return f.Error()
+	}
 	s.members[client.NewFromConn(conn)] = struct{}{}
+	s.logger.Debugf("node %s at %s joined successfully", nodeID, addr)
 	return nil
+
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, cmd *core.CommandSet) error {

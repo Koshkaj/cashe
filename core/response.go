@@ -39,3 +39,15 @@ func (r *ResponseGet) Bytes() []byte {
 	binary.Write(buf, binary.LittleEndian, r.Value)
 	return buf.Bytes()
 }
+
+type ResponseHas struct {
+	Status Status
+	Value  bool
+}
+
+func (r *ResponseHas) Bytes() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, r.Status)
+	binary.Write(buf, binary.LittleEndian, r.Value)
+	return buf.Bytes()
+}

@@ -31,6 +31,27 @@ func New(endpoint string, opts Options) (*Client, error) {
 	}, nil
 }
 
+func (c *Client) Has(ctx context.Context, key []byte) (bool, error) {
+	cmd := core.CommandHas{
+		Key: key,
+	}
+	_, err := c.conn.Write(cmd.Bytes())
+	if err != nil {
+		return false, err
+	}
+	resp, err := core.ParseHasResponse(c.conn)
+	if err != nil {
+		return false, err
+	}
+	if resp.Status == core.StatusKeyNotFound {
+		return false, fmt.Errorf("could not find key (%s)", resp.Status)
+	}
+	if resp.Status != core.StatusOK {
+		return false, fmt.Errorf("server responsed with error %s", resp.Status)
+	}
+	return resp.Value, nil
+}
+
 func (c *Client) Get(ctx context.Context, key []byte) ([]byte, error) {
 	cmd := &core.CommandGet{
 		Key: key,

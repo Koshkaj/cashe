@@ -54,6 +54,13 @@ func ParseDelResponse(r io.Reader) (*ResponseDel, error) {
 	return resp, err
 }
 
+func ParseHasResponse(r io.Reader) (*ResponseHas, error) {
+	resp := &ResponseHas{}
+	binary.Read(r, binary.LittleEndian, &resp.Status)
+	err := binary.Read(r, binary.LittleEndian, &resp.Value)
+	return resp, err
+}
+
 func ParseCommand(r io.Reader) (any, error) {
 	var cmd Command
 	if err := binary.Read(r, binary.LittleEndian, &cmd); err != nil {
@@ -68,6 +75,8 @@ func ParseCommand(r io.Reader) (any, error) {
 		return parseJoinCommand(r), nil
 	case CmdDel:
 		return parseDelCommand(r), nil
+	case CmdHas:
+		return parseHasCommand(r), nil
 	default:
 		return nil, fmt.Errorf("invalid command %s", string(cmd))
 	}
@@ -122,6 +131,16 @@ func parseGetCommand(r io.Reader) *CommandGet {
 
 func parseDelCommand(r io.Reader) *CommandDel {
 	cmd := &CommandDel{}
+	var keyLen int32
+	binary.Read(r, binary.LittleEndian, &keyLen)
+	cmd.Key = make([]byte, keyLen)
+	binary.Read(r, binary.LittleEndian, &cmd.Key)
+	return cmd
+}
+
+func parseHasCommand(r io.Reader) *CommandHas {
+	cmd := &CommandHas{}
+
 	var keyLen int32
 	binary.Read(r, binary.LittleEndian, &keyLen)
 	cmd.Key = make([]byte, keyLen)

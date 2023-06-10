@@ -120,6 +120,8 @@ func (s *Server) handleCommand(conn net.Conn, cmd any) {
 		s.handleJoinCommand(conn, v)
 	case *core.CommandDel:
 		s.handleDelCommand(conn, v)
+	case *core.CommandHas:
+		s.handleHasCommand(conn, v)
 	}
 }
 
@@ -217,4 +219,19 @@ func (s *Server) handleDelCommand(conn net.Conn, cmd *core.CommandDel) error {
 
 	_, err := conn.Write(resp.Bytes())
 	return err
+}
+
+func (s *Server) handleHasCommand(conn net.Conn, cmd *core.CommandHas) error {
+	resp := core.ResponseHas{}
+	value := s.cache.Has(cmd.Key)
+	if !value {
+		resp.Status = core.StatusKeyNotFound
+		_, err := conn.Write(resp.Bytes())
+		return err
+	}
+	resp.Value = value
+	resp.Status = core.StatusOK
+	_, err := conn.Write(resp.Bytes())
+	return err
+
 }

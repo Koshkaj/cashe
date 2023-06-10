@@ -13,11 +13,6 @@ type RaftServer struct {
 	*raft.Raft
 }
 
-func (rs *RaftServer) NewServer(serverID, addr string) error {
-	f := rs.AddVoter(raft.ServerID(serverID), raft.ServerAddress(addr), 0, 0)
-	return f.Error()
-}
-
 func New(serverID, port string) *RaftServer {
 	var (
 		cfg           = raft.DefaultConfig()
@@ -38,7 +33,7 @@ func New(serverID, port string) *RaftServer {
 	server := raft.Server{
 		Suffrage: raft.Voter,
 		ID:       raft.ServerID(cfg.LocalID),
-		Address:  raft.ServerAddress("127.0.0.1:3000"),
+		Address:  tr.LocalAddr(),
 	}
 
 	serverConfig := raft.Configuration{

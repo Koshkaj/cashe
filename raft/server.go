@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Koshkaj/cashe/cache"
 	"github.com/hashicorp/raft"
 )
 
@@ -13,10 +14,9 @@ type RaftServer struct {
 	*raft.Raft
 }
 
-func New(serverID, port string) *RaftServer {
+func New(serverID string, port string, fsm *cache.CacheFSM) *RaftServer {
 	var (
 		cfg           = raft.DefaultConfig()
-		fsm           = &raft.MockFSM{}
 		logStore      = raft.NewInmemStore()
 		stableStore   = raft.NewInmemStore()
 		snapShotStore = raft.NewInmemSnapshotStore()

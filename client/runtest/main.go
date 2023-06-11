@@ -26,14 +26,13 @@ func SendCommand() {
 		if err := c.Set(context.Background(), key, value, 20); err != nil {
 			log.Fatal(err)
 		}
-
 		val, _ := c.Get(context.Background(), key)
 		fmt.Println(val)
-		ok, _ := c.Has(context.Background(), key)
-		fmt.Println(ok)
+		// ok, _ := c.Has(context.Background(), key)
+		// fmt.Println(ok)
 
 		time.Sleep(time.Second)
-		err = c.Delete(context.Background(), key)
+		// err = c.Delete(context.Background(), key)
 	}
 	c.Close()
 }

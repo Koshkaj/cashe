@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
 	"net"
-	"time"
 
 	"github.com/Koshkaj/cashe/cache"
 	"github.com/Koshkaj/cashe/client"
@@ -15,6 +13,8 @@ import (
 	"github.com/hashicorp/raft"
 	"go.uber.org/zap"
 )
+
+const raftTimeout = 0
 
 type ServerOpts struct {
 	ListenAddr     string
@@ -36,7 +36,8 @@ type Server struct {
 func NewServer(opts ServerOpts, c cache.Cacher) *Server {
 	l, _ := zap.NewProduction()
 	lsugar := l.Sugar()
-	r := rf.New(opts.NodeID, opts.RaftAddr)
+	fsm := cache.NewCacheFSM(c)
+	r := rf.New(opts.NodeID, opts.RaftAddr, fsm)
 	return &Server{
 		ServerOpts: opts,
 		cache:      c,
@@ -160,23 +161,17 @@ func (s *Server) handleJoinCommand(conn net.Conn, cmd *core.CommandJoin) error {
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, cmd *core.CommandSet) error {
-	log.Printf("SET : %s => %s\n", cmd.Key, cmd.Value)
-
-	go func() {
-		for member := range s.members {
-			err := member.Set(context.TODO(), cmd.Key, cmd.Value, cmd.TTL)
-			if err != nil {
-				log.Println("forward to member error", err)
-			}
-		}
-	}()
+	s.logger.Infof("SET : %s => %s\n", cmd.Key, cmd.Value)
+	if s.raft.State() != raft.Leader {
+		return fmt.Errorf("not leader")
+	}
 
 	resp := core.ResponseSet{}
-	if err := s.cache.Set(cmd.Key, cmd.Value, time.Duration(cmd.TTL)*time.Second); err != nil {
+	f := s.raft.Apply(cmd.Bytes(), raftTimeout)
+	if err := f.Error(); err != nil {
 		resp.Status = core.StatusError
 		_, err := conn.Write(resp.Bytes())
 		return err
-
 	}
 	resp.Status = core.StatusOK
 
@@ -200,17 +195,11 @@ func (s *Server) handleGetCommand(conn net.Conn, cmd *core.CommandGet) error {
 }
 
 func (s *Server) handleDelCommand(conn net.Conn, cmd *core.CommandDel) error {
-	go func() {
-		for member := range s.members {
-			err := member.Delete(context.TODO(), cmd.Key)
-			if err != nil {
-				log.Println("forward to member error", err)
-			}
-		}
-	}()
+	s.logger.Infof("DEL %s", cmd.Key)
 
 	resp := core.ResponseDel{}
-	if err := s.cache.Delete(cmd.Key); err != nil {
+	f := s.raft.Apply(cmd.Bytes(), raftTimeout)
+	if err := f.Error(); err != nil {
 		resp.Status = core.StatusError
 		_, err := conn.Write(resp.Bytes())
 		return err

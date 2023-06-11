@@ -22,13 +22,13 @@ func (c *Cache) Set(key, value []byte, ttl time.Duration) error {
 	defer c.mu.Unlock()
 	c.data[string(key)] = value
 
-	if ttl > 0 {
-		go func() {
-			// Move to the one goroutine with locking (channels)
-			<-time.After(ttl)
-			delete(c.data, string(key))
-		}()
-	}
+	// if ttl > 0 {
+	// 	go func() {
+	// 		// Move to the one goroutine with locking (channels)
+	// 		<-time.After(ttl)
+	// 		delete(c.data, string(key))
+	// 	}()
+	// }
 	return nil
 }
 

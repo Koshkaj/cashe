@@ -15,27 +15,6 @@ type CacheFSM struct {
 	*Cache
 }
 
-func (f *CacheFSM) applySet(key []byte, value []byte, ttl time.Duration) interface{} {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.data[string(key)] = value
-	// if ttl > 0 {
-	// 	go func() {
-	// 		// Move to the one goroutine with locking (channels)
-	// 		<-time.After(ttl)
-	// 		delete(f.data, string(key))
-	// 	}()
-	// }
-	return nil
-}
-
-func (f *CacheFSM) applyDelete(key []byte) interface{} {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	delete(f.data, string(key))
-	return nil
-}
-
 func NewCacheFSM(c Cacher) *CacheFSM {
 	return &CacheFSM{
 		Cache: c.(*Cache),
@@ -47,18 +26,16 @@ type fsmSnapshot struct {
 }
 
 func (f *CacheFSM) Apply(l *raft.Log) interface{} {
-	fmt.Printf("Address of data in fsm: %p %v\n", f.data, f.data)
 	reader := bytes.NewReader(l.Data)
 	cmd, err := core.ParseCommand(reader)
-	fmt.Println(reader)
 	if err != nil {
 		return err
 	}
 	switch v := cmd.(type) {
 	case *core.CommandSet:
-		f.applySet(v.Key, v.Value, time.Duration(v.TTL))
+		f.Set(v.Key, v.Value, time.Duration(v.TTL))
 	case *core.CommandDel:
-		f.applyDelete(v.Key)
+		f.Delete(v.Key)
 	default:
 		return nil
 	}

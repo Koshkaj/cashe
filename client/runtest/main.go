@@ -23,7 +23,7 @@ func SendCommand() {
 			key   = []byte(fmt.Sprintf("key_%d", i))
 			value = []byte(fmt.Sprintf("value_%d", i))
 		)
-		if err := c.Set(context.Background(), key, value, 20); err != nil {
+		if err := c.Set(context.Background(), key, value, 2); err != nil {
 			log.Fatal(err)
 		}
 		val, _ := c.Get(context.Background(), key)

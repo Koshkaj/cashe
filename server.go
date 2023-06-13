@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 
 	"github.com/Koshkaj/cashe/cache"
 	"github.com/Koshkaj/cashe/client"
@@ -17,12 +18,13 @@ import (
 const raftTimeout = 0
 
 type ServerOpts struct {
-	ListenAddr     string
-	IsLeader       bool
-	LeaderAddr     string
-	RaftAddr       string
-	RaftLeaderAddr string
-	NodeID         string
+	ListenAddr       string
+	IsLeader         bool
+	LeaderAddr       string
+	RaftAddr         string
+	RaftLeaderAddr   string
+	NodeID           string
+	EvictionInterval time.Duration
 }
 
 type Server struct {
@@ -47,6 +49,21 @@ func NewServer(opts ServerOpts, c cache.Cacher) *Server {
 	}
 }
 
+func (s *Server) EvictionLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	c := s.cache.(*cache.Cache)
+	go func() {
+		for range ticker.C {
+			for key, value := range c.Expiry {
+				if time.Now().After(value) {
+					c.Delete([]byte(key))
+					s.raft.Snapshot()
+				}
+			}
+		}
+	}()
+}
+
 func (s *Server) Start() error {
 	ln, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
@@ -62,7 +79,7 @@ func (s *Server) Start() error {
 	}
 
 	s.logger.Infow("server starting on port", "port", s.ListenAddr)
-
+	s.EvictionLoop(s.ServerOpts.EvictionInterval)
 	for {
 		conn, err := ln.Accept()
 		if err != nil {

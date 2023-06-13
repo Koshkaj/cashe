@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/Koshkaj/cashe/cache"
 )
@@ -18,11 +19,12 @@ func main() {
 	)
 	flag.Parse()
 	opts := ServerOpts{
-		ListenAddr: *listenAddr,
-		LeaderAddr: *leaderAddr,
-		IsLeader:   len(*leaderAddr) == 0,
-		RaftAddr:   *raftAddr,
-		NodeID:     *nodeID,
+		ListenAddr:       *listenAddr,
+		LeaderAddr:       *leaderAddr,
+		IsLeader:         len(*leaderAddr) == 0,
+		RaftAddr:         *raftAddr,
+		NodeID:           *nodeID,
+		EvictionInterval: 5 * time.Second,
 	}
 
 	server := NewServer(opts, cache.New())

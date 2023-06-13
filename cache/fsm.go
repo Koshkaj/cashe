@@ -3,7 +3,6 @@ package cache
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"time"
 
@@ -39,7 +38,6 @@ func (f *CacheFSM) Apply(l *raft.Log) interface{} {
 	default:
 		return nil
 	}
-	fmt.Println("after set", f.data)
 	return nil
 }
 

@@ -13,8 +13,16 @@ Cashe is a distributed key-value store database that leverages the Raft consensu
 
 ### ⚡️ **Fast and Efficient**: The Go programming language used in Cashe ensures high performance and efficient resource utilization.
 
+### 🔒 **Fault Tolerance**: Cashe is resilient to node failures and automatically recovers from such failures, ensuring data integrity and availability.
 
 ### 🌐 **Distributed Architecture**: Cashe distributes data across multiple nodes, allowing for better load distribution and fault tolerance.
+
+## **How It Works**
+Cashe implements the Raft consensus algorithm to achieve distributed consensus among the nodes in the cluster. The Raft algorithm ensures that all nodes agree on the state of the system, even in the presence of failures.
+
+When a client wants to store or retrieve data, it interacts with any node in the cluster. The node that receives the request acts as a leader and coordinates with other nodes to replicate the data and achieve consensus. Once the data is successfully replicated, the leader responds to the client with the appropriate result.
+
+In case of a leader node failure, a new leader is elected through the Raft algorithm, ensuring uninterrupted service availability. Cashe also handles situations where nodes join or leave the cluster dynamically, redistributing data and adjusting the cluster membership accordingly.
 
 
 ## **Getting Started**

@@ -73,6 +73,8 @@ func ParseCommand(r io.Reader) (any, error) {
 		return parseGetCommand(r), nil
 	case CmdJoin:
 		return parseJoinCommand(r), nil
+	case CmdLeave:
+		return parseLeaveCommand(r), nil
 	case CmdDel:
 		return parseDelCommand(r), nil
 	case CmdHas:
@@ -96,6 +98,15 @@ func parseJoinCommand(r io.Reader) *CommandJoin {
 	cmd.NodeID = make([]byte, nodeIDLen)
 	binary.Read(r, binary.LittleEndian, &cmd.NodeID)
 
+	return cmd
+}
+
+func parseLeaveCommand(r io.Reader) *CommandLeave {
+	cmd := &CommandLeave{}
+	var nodeIdLen int32
+	binary.Read(r, binary.LittleEndian, &nodeIdLen)
+	cmd.NodeID = make([]byte, nodeIdLen)
+	binary.Read(r, binary.LittleEndian, &cmd.NodeID)
 	return cmd
 }
 

@@ -101,6 +101,17 @@ func (s *Server) writeJoinCmd(conn net.Conn) error {
 	return nil
 }
 
+func (s *Server) writeLeaveCmd(conn net.Conn) error {
+	cmd := &core.CommandLeave{
+		NodeID: []byte(s.NodeID),
+	}
+	_, err := conn.Write(cmd.Bytes())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Server) dialLeader() error {
 	conn, err := net.Dial("tcp", s.LeaderAddr)
 	if err != nil {
@@ -135,6 +146,8 @@ func (s *Server) handleCommand(conn net.Conn, cmd any) {
 		s.handleGetCommand(conn, v)
 	case *core.CommandJoin:
 		s.handleJoinCommand(conn, v)
+	case *core.CommandLeave:
+		s.handleLeaveCommand(conn, v)
 	case *core.CommandDel:
 		s.handleDelCommand(conn, v)
 	case *core.CommandHas:
@@ -174,6 +187,23 @@ func (s *Server) handleJoinCommand(conn net.Conn, cmd *core.CommandJoin) error {
 	s.logger.Debugf("node %s at %s joined successfully", nodeID, addr)
 	return nil
 
+}
+
+func (s *Server) handleLeaveCommand(conn net.Conn, cmd *core.CommandLeave) error {
+	s.logger.Infow("member leaving cluster", "address", conn.RemoteAddr())
+	// raft server disconnect
+	configFuture := s.raft.GetConfiguration()
+	if err := configFuture.Error(); err != nil {
+		s.logger.Errorf("failed to get raft configuration: %v", err)
+		return err
+	}
+	nodeID := string(cmd.NodeID)
+	future := s.raft.RemoveServer(raft.ServerID(nodeID), 0, 0)
+	if err := future.Error(); err != nil {
+		return fmt.Errorf("error removing existing node %s", nodeID)
+	}
+	s.logger.Debugf("node %s at %s disconnected successfully", nodeID)
+	return nil
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, cmd *core.CommandSet) error {

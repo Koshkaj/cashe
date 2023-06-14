@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"net"
 	"os"
 	"os/signal"
 	"time"
@@ -35,8 +36,21 @@ func main() {
 	signal.Notify(terminate, os.Interrupt, os.Kill)
 	<-terminate
 	func() {
-		if err := server.raft.RemoveServer(raft.ServerID(server.NodeID), 0, 0).Error(); err != nil {
-			server.logger.Errorf("Failed to remove old leader from Raft configuration: %s", err)
+		_, leaderID := server.raft.LeaderWithID()
+		if server.NodeID == string(leaderID) && len(server.members) > 0 {
+			// If leader is disconnected and it has multiple members
+			if err := server.raft.RemoveServer(raft.ServerID(server.NodeID), 0, 0).Error(); err != nil {
+				server.logger.Errorf("Failed to remove old leader from Raft configuration: %s", err)
+			}
+		} else {
+			// if member is disconnected, update config so that leader does not try to connect to it infinitely
+			// its member, we can be sure that leaderaddr is provided
+			conn, err := net.Dial("tcp", server.LeaderAddr)
+			if err != nil {
+				server.logger.Fatal(err)
+			}
+			server.writeLeaveCmd(conn)
+
 		}
 	}()
 	server.logger.Infof("node shutdown [%s]", server.NodeID)

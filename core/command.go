@@ -12,8 +12,9 @@ const (
 	CmdSet
 	CmdGet
 	CmdDel
-	CmdJoin
 	CmdHas
+	CmdJoin
+	CmdLeave
 )
 
 type CommandGet struct {
@@ -72,6 +73,21 @@ func (c *CommandJoin) Bytes() []byte {
 	binary.Write(buf, binary.LittleEndian, c.NodeID)
 	return buf.Bytes()
 
+}
+
+type CommandLeave struct {
+	NodeID []byte
+}
+
+func (c *CommandLeave) Bytes() []byte {
+	buf := new(bytes.Buffer)
+
+	binary.Write(buf, binary.LittleEndian, CmdLeave)
+	nodeIDLen := int32(len(c.NodeID))
+	binary.Write(buf, binary.LittleEndian, nodeIDLen)
+	binary.Write(buf, binary.LittleEndian, c.NodeID)
+
+	return buf.Bytes()
 }
 
 type CommandDel struct {

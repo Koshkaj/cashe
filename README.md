@@ -15,3 +15,21 @@ Cashe is a distributed key-value store database that leverages the Raft consensu
 
 
 ### 🌐 **Distributed Architecture**: Cashe distributes data across multiple nodes, allowing for better load distribution and fault tolerance.
+
+
+## **Getting Started**
+
+1. Install Dependencies
+```shell
+make install
+```
+2. Start a master node 
+```shell
+./bin/cashe --id=raft0 --listenaddr=:3000  --raftaddr=:4000
+```
+3. Start second and third node
+```shell
+./bin/cashe --listenaddr :3001 --leaderaddr :3000 --raftaddr=:4001 --id=raft1
+
+./bin/cashe --listenaddr :3002 --leaderaddr :3000 --raftaddr=:4002 --id=raft2
+```

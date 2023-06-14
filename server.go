@@ -15,14 +15,13 @@ import (
 	"go.uber.org/zap"
 )
 
-const raftTimeout = 0
+const raftTimeout = 5
 
 type ServerOpts struct {
 	ListenAddr       string
 	IsLeader         bool
 	LeaderAddr       string
 	RaftAddr         string
-	RaftLeaderAddr   string
 	NodeID           string
 	EvictionInterval time.Duration
 }

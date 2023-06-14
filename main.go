@@ -2,12 +2,12 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/Koshkaj/cashe/cache"
+	"github.com/hashicorp/raft"
 )
 
 func main() {
@@ -29,9 +29,15 @@ func main() {
 
 	server := NewServer(opts, cache.New())
 	go func() {
-		log.Fatal(server.Start())
+		server.logger.Fatal(server.Start())
 	}()
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt, os.Kill)
 	<-terminate
+	func() {
+		if err := server.raft.RemoveServer(raft.ServerID(server.NodeID), 0, 0).Error(); err != nil {
+			server.logger.Errorf("Failed to remove old leader from Raft configuration: %s", err)
+		}
+	}()
+	server.logger.Infof("node shutdown [%s]", server.NodeID)
 }

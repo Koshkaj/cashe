@@ -54,7 +54,7 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 		delete(c.Expiry, string(key))
 		c.expiryMu.Unlock()
 
-		return nil, fmt.Errorf("key %s not found", keyStr)
+		return nil, nil
 	}
 
 	return val, nil

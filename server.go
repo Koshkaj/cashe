@@ -5,10 +5,10 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/Koshkaj/cashe/cache"
-	"github.com/Koshkaj/cashe/client"
 	"github.com/Koshkaj/cashe/core"
 	rf "github.com/Koshkaj/cashe/raft"
 	"github.com/hashicorp/raft"
@@ -28,10 +28,12 @@ type ServerOpts struct {
 
 type Server struct {
 	ServerOpts
-	members map[*client.Client]struct{}
-	cache   cache.Cacher
-	logger  *zap.SugaredLogger
-	raft    *rf.RaftServer
+
+	memberMu sync.Mutex
+	members  map[string]string
+	cache    cache.Cacher
+	logger   *zap.SugaredLogger
+	raft     *rf.RaftServer
 }
 
 func NewServer(opts ServerOpts, c cache.Cacher) *Server {
@@ -42,7 +44,7 @@ func NewServer(opts ServerOpts, c cache.Cacher) *Server {
 	return &Server{
 		ServerOpts: opts,
 		cache:      c,
-		members:    make(map[*client.Client]struct{}),
+		members:    make(map[string]string),
 		logger:     lsugar,
 		raft:       r,
 	}
@@ -76,9 +78,8 @@ func (s *Server) Start() error {
 			}
 		}()
 	}
-
-	s.logger.Infow("server starting on port", "port", s.ListenAddr)
 	s.EvictionLoop(s.ServerOpts.EvictionInterval)
+	s.logger.Infow("server starting on port", "port", s.ListenAddr)
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -183,7 +184,10 @@ func (s *Server) handleJoinCommand(conn net.Conn, cmd *core.CommandJoin) error {
 	if f.Error() != nil {
 		return f.Error()
 	}
-	s.members[client.NewFromConn(conn)] = struct{}{}
+	s.memberMu.Lock()
+	s.members[nodeID] = conn.RemoteAddr().String()
+	s.memberMu.Unlock()
+
 	s.logger.Debugf("node %s at %s joined successfully", nodeID, addr)
 	return nil
 
@@ -203,6 +207,10 @@ func (s *Server) handleLeaveCommand(conn net.Conn, cmd *core.CommandLeave) error
 		return fmt.Errorf("error removing existing node %s", nodeID)
 	}
 	s.logger.Debugf("node %s at %s disconnected successfully", nodeID)
+	s.memberMu.Lock()
+	delete(s.members, nodeID)
+	s.memberMu.Unlock()
+
 	return nil
 }
 
@@ -228,6 +236,7 @@ func (s *Server) handleSetCommand(conn net.Conn, cmd *core.CommandSet) error {
 func (s *Server) handleGetCommand(conn net.Conn, cmd *core.CommandGet) error {
 	resp := core.ResponseGet{}
 	value, err := s.cache.Get(cmd.Key)
+	s.logger.Infof("GET : %s => %s\n", cmd.Key, value)
 	if err != nil {
 		resp.Status = core.StatusKeyNotFound
 		_, err := conn.Write(resp.Bytes())

@@ -22,7 +22,6 @@ func New(serverID string, port string, fsm *cache.CacheFSM) *RaftServer {
 		snapShotStore = raft.NewInmemSnapshotStore()
 		timeout       = time.Second * 10
 	)
-	// os.Getenv("RAFT_MASTER_NODE_ID")
 
 	cfg.LocalID = raft.ServerID(serverID)
 	addr := fmt.Sprintf("127.0.0.1%s", port)

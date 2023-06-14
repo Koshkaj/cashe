@@ -76,7 +76,3 @@ func (c *Cache) Has(key []byte) bool {
 	_, ok := c.data[string(key)]
 	return ok
 }
-
-// TODO:
-// make TTL more robust
-// Somehow avoid locks ?
